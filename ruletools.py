@@ -1,5 +1,4 @@
 import ida_hexrays
-import ida_hexrays_ctree
 import common
 from typing import Callable
 from re import search
@@ -11,16 +10,16 @@ def CotToStr(cot: int) -> str:
 	return CotToStr._keys.get(cot, f"unknown_{cot}")
 
 
-def PrintItem(e: ida_hexrays_ctree.cexpr_t):
+def PrintItem(e: ida_hexrays.cexpr_t):
 	t = e.type
 	op = e.op
 	op_name = CotToStr(op)
 
-	if op == ida_hexrays_ctree.cot_num:
+	if op == ida_hexrays.cot_num:
 		val = f" {e.numval()}"
 	else:
 		val = ""
-	if op == ida_hexrays_ctree.cot_call:
+	if op == ida_hexrays.cot_call:
 		t = e.x.type
 
 	print(f"  {op_name + val:<15}{t}")
@@ -38,7 +37,7 @@ def DebugItems(func):
 
 
 def ParsePattern(chain_str: str,
-                 predicate: Callable[[ida_hexrays_ctree.cexpr_t], bool] | None = None
+                 predicate: Callable[[ida_hexrays.cexpr_t], bool] | None = None
                  ) -> common.Slice:
 	lines = chain_str.strip().split('\n')
 	nodes = {}
@@ -54,7 +53,7 @@ def ParsePattern(chain_str: str,
 			op_values = []
 
 			for op_name in op_parts:
-				if not (op_val := getattr(ida_hexrays_ctree, op_name, None)):
+				if not (op_val := getattr(ida_hexrays, op_name, None)):
 					op_val = getattr(common, op_name, None)
 				assert op_val is not None, f"{op_name} not found"
 				op_values.append(op_val)

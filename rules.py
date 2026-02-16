@@ -1,5 +1,5 @@
 import ida_typeinf
-from ida_hexrays_ctree import cexpr_t, cot_call, cot_add, cot_var, cot_num, cot_ptr, cot_cast
+from ida_hexrays import cexpr_t, cot_call, cot_add, cot_var, cot_num, cot_ptr, cot_cast
 from common import RuleExtractResult, AccessInfo, Slice, Rule
 from ruletools import ParsePattern, DebugItems, PrintItem
 

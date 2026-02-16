@@ -3,7 +3,7 @@
     "plugin": {
         "name": "Suture",
         "entryPoint": "main.py",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "description": "Automated structure recovery using AST pattern matching",
         "logoPath": "icon.png",
         "license": "MIT",

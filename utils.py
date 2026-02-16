@@ -2,8 +2,6 @@ import common
 import ida_typeinf
 import ida_kernwin
 import ida_hexrays
-import ida_hexrays_micro
-import ida_hexrays_ctree
 import idc
 
 
@@ -102,12 +100,12 @@ def ask_struct_name() -> str | None:
 		return name
 
 
-def get_current_vdui() -> ida_hexrays_ctree.vdui_t:
+def get_current_vdui() -> ida_hexrays.vdui_t:
 	widget = ida_kernwin.get_current_widget()
 	return ida_hexrays.get_widget_vdui(widget)
 
 
-def get_cursor_lvar(vdui) -> ida_hexrays_micro.lvar_t | None:
+def get_cursor_lvar(vdui) -> ida_hexrays.lvar_t | None:
 	try:
 		cit = vdui.item.it
 		lvars = vdui.cfunc.get_lvars()
@@ -124,7 +122,7 @@ def can_process_lvar(vdui: ida_hexrays.vdui_t) -> bool:
 	if not vdui:
 		return False
 
-	if vdui.get_current_item(ida_hexrays_ctree.USE_KEYBOARD):
+	if vdui.get_current_item(ida_hexrays.USE_KEYBOARD):
 		lvar = get_cursor_lvar(vdui)
 		if lvar:
 			return True
