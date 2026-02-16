@@ -3,7 +3,6 @@ from typing import Callable, Type
 from abc import ABC, abstractmethod
 
 import ida_hexrays
-import ida_hexrays_ctree
 import ida_typeinf
 import ida_lines
 import utils
@@ -21,7 +20,7 @@ class Slice:
 	             y: int | Slice | tuple[int | Slice, ...] | None = None,
 	             z: int | Slice | tuple[int | Slice, ...] | None = None,
 	             a: dict[int, Slice] | Slice | None = None,
-	             predicate: Callable[[ida_hexrays_ctree.cexpr_t], bool] | None = None
+	             predicate: Callable[[ida_hexrays.cexpr_t], bool] | None = None
 	             ):
 		self.base = base
 		self.x = x
@@ -30,11 +29,11 @@ class Slice:
 		self.a = a
 		self.predicate = predicate
 		if a and isinstance(base, int):
-			assert base == ida_hexrays_ctree.cot_call, '"a=" parameter is supported for cot_call only'
+			assert base == ida_hexrays.cot_call, '"a=" parameter is supported for cot_call only'
 		self.assert_no_nested_cot_call(True)
 
 	def assert_no_nested_cot_call(self, is_root=False):
-		if not is_root and self.base == ida_hexrays_ctree.cot_call:
+		if not is_root and self.base == ida_hexrays.cot_call:
 			if self.a and isinstance(self.a, Slice):
 				raise NotImplementedError("Nested cot_call with wildcard is not supported. Please use a={x:y}")
 
@@ -49,7 +48,7 @@ class Slice:
 				if isinstance(val, Slice):
 					val.assert_no_nested_cot_call()
 
-	def matches(self, expr: ida_hexrays_ctree.cexpr_t, collected: list[ida_hexrays_ctree.cexpr_t]) -> bool:
+	def matches(self, expr: ida_hexrays.cexpr_t, collected: list[ida_hexrays.cexpr_t]) -> bool:
 		init_len = len(collected)
 		k1 = False
 
@@ -125,7 +124,7 @@ class Slice:
 					return False
 				collected.append(leaf)
 
-		if self.a and expr.op == ida_hexrays_ctree.cot_call:
+		if self.a and expr.op == ida_hexrays.cot_call:
 			if not isinstance(self.a, dict):
 				raise Exception("Failed a= expansion")
 
@@ -304,7 +303,7 @@ class Rule(ABC):
 		# if pattern is elevated it ignores exlusivity
 		return False
 
-	def match(self, start: ida_hexrays_ctree.cexpr_t) -> list[ida_hexrays_ctree.cexpr_t] | None:
+	def match(self, start: ida_hexrays.cexpr_t) -> list[ida_hexrays.cexpr_t] | None:
 		collected = list()
 		p = self._expanded_pattern or self.pattern
 		if p.matches(start, collected):
@@ -317,7 +316,7 @@ class Rule(ABC):
 		pass
 
 	@abstractmethod
-	def extract(self, items: list[ida_hexrays_ctree.cexpr_t]) -> RuleExtractResult:
+	def extract(self, items: list[ida_hexrays.cexpr_t]) -> RuleExtractResult:
 		pass
 
 	def __str__(self):
@@ -408,7 +407,7 @@ class RuleSet(ABC):
 			ins = rule_cls()
 			pattern = ins.pattern
 
-			if pattern.base == ida_hexrays_ctree.cot_call:
+			if pattern.base == ida_hexrays.cot_call:
 				if isinstance(pattern.a, Slice):
 					for i in range(RuleSet.ArgumentLimit):
 						r = rule_cls()
@@ -444,18 +443,18 @@ class RuleSet(ABC):
 		return str(self.__class__.__name__)
 
 
-class Visitor(ida_hexrays_ctree.ctree_visitor_t):
+class Visitor(ida_hexrays.ctree_visitor_t):
 	def __init__(self, matcher: Matcher):
-		super().__init__(ida_hexrays_ctree.CV_PARENTS)
+		super().__init__(ida_hexrays.CV_PARENTS)
 		self.matcher = matcher
 
-	def visit_expr(self, arg0: ida_hexrays_ctree.cexpr_t) -> int:
+	def visit_expr(self, arg0: ida_hexrays.cexpr_t) -> int:
 		self.matcher.gather(len(self.parents), arg0)
 		return 0
 
 
 class MatchResult:
-	def __init__(self, rule: Rule, items: list[ida_hexrays_ctree.cexpr_t]):
+	def __init__(self, rule: Rule, items: list[ida_hexrays.cexpr_t]):
 		self.rule = rule
 		self.items = items
 
@@ -464,9 +463,9 @@ class MatchResult:
 
 
 class Matcher:
-	def __init__(self, cfunc: ida_hexrays_ctree.cfunc_t, rule_set: RuleSet):
+	def __init__(self, cfunc: ida_hexrays.cfunc_t, rule_set: RuleSet):
 		self.rule_set = rule_set
-		self.heads: dict[int, tuple[int, ida_hexrays_ctree.cexpr_t]] = dict()
+		self.heads: dict[int, tuple[int, ida_hexrays.cexpr_t]] = dict()
 		self.hooks: set[int] = self.get_hooks(rule_set)
 		self.visitor = Visitor(self).apply_to(cfunc.body, None)
 
@@ -490,12 +489,12 @@ class Matcher:
 		assert cot_none not in ops, "Rule pattern can't start with cot_none"
 		return ops
 
-	def gather(self, depth: int, item: ida_hexrays_ctree.cexpr_t):
+	def gather(self, depth: int, item: ida_hexrays.cexpr_t):
 		if item.op in self.hooks:
 			self.heads[item.obj_id] = (depth, item)
 
 	def match(self) -> list[MatchResult]:
-		excluded: list[ida_hexrays_ctree.citem_t] = list()
+		excluded: list[ida_hexrays.citem_t] = list()
 		matches: list[MatchResult] = list()
 
 		for depth, item in sorted(self.heads.values(), key=lambda x: x[0]):
@@ -517,7 +516,7 @@ class Matcher:
 						print("  MATCHED")
 
 					if rule.exclusive:
-						if item.op == ida_hexrays_ctree.cot_call:
+						if item.op == ida_hexrays.cot_call:
 							if len(items) > 1:
 								args = [a for a in item.a]
 								found = False
@@ -537,7 +536,7 @@ class Matcher:
 
 
 class Extractor:
-	def __init__(self, lvar_name: str, cfunc: ida_hexrays_ctree.cfunc_t, matches: list[MatchResult]):
+	def __init__(self, lvar_name: str, cfunc: ida_hexrays.cfunc_t, matches: list[MatchResult]):
 		self.lvar_name = lvar_name
 		self.lvars = cfunc.get_lvars()
 		self.filtered = self.filter(matches)
@@ -551,7 +550,7 @@ class Extractor:
 		# keep only items that reference target lvar
 		for r in results:
 			for i in r.items:
-				if i.op == ida_hexrays_ctree.cot_var and self.is_target_lvar(i.get_v().idx):
+				if i.op == ida_hexrays.cot_var and self.is_target_lvar(i.get_v().idx):
 					filtered.append(r)
 					break
 

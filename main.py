@@ -1,8 +1,6 @@
 from rulesets import ClassRuleSet, StackRuleSet
 import ida_kernwin
 import ida_hexrays
-import ida_hexrays_micro
-import ida_hexrays_ctree
 import ida_typeinf
 import ida_idaapi
 import common
@@ -15,7 +13,7 @@ class Suture(ida_kernwin.action_handler_t):
 	def __init__(self):
 		super().__init__()
 		self.vdui: ida_hexrays.vdui_t
-		self.lvar: ida_hexrays_micro.lvar_t
+		self.lvar: ida_hexrays.lvar_t
 		self.lvar_name: str
 		self.lvar_type: ida_typeinf.tinfo_t
 		self.lvar_type_new: ida_typeinf.tinfo_t | None
