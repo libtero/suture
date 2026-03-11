@@ -568,9 +568,11 @@ class Extractor:
 		return self.filtered, self.extract()
 
 
-class Populator:
-	Struct = dict
+class Struct(dict):
+	pass
 
+
+class Populator:
 	def __init__(self, struct: ida_typeinf.tinfo_t, results: list[RuleExtractResult]):
 		self.shift = utils.get_ptr_shift(struct)
 		self.struct_tif = struct.get_pointed_object() if struct.is_ptr() else struct
@@ -578,22 +580,22 @@ class Populator:
 		self.run()
 
 	def run(self):
-		layout = self.create_layout(self.results)
-
-		def _print_layout(l: Populator.Struct, lvl=0):
-			for k, v in sorted(l.items()):
-				if isinstance(v, Populator.Struct):
-					print("    " * lvl + f"0x{k:02X} ->")
-					_print_layout(v, lvl + 1)
-				else:
-					print("    " * lvl + f"0x{k:02X}: {v}")
-
+		layout_raw = self.create_layout(self.results)
+		layout = self.clear_overlaps(layout_raw)
 		if DEBUG:
-			print("\n------ LAYOUT ------")
-			_print_layout(layout)
-			print()
-
+			print(f"\n------ LAYOUT RAW ------")
+			self.pprint_layout(layout_raw)
+			print(f"\n------ LAYOUT CLEARED ------")
+			self.pprint_layout(layout)
 		self.populate(self.struct_tif, layout, self.shift)
+
+	def pprint_layout(self, l: Struct, lvl = 0):
+		for k, v in sorted(l.items()):
+			if isinstance(v, Struct):
+				print("    " * lvl + f"0x{k:02X} ->")
+				self.pprint_layout(v, lvl + 1)
+			else:
+				print("    " * lvl + f"0x{k:02X}: {v}")
 
 	def populate(self, s: ida_typeinf.tinfo_t, l: dict[int, dict | tinfo_t], shift=0):
 		for o, t in l.items():
@@ -602,12 +604,12 @@ class Populator:
 			added = False
 
 			if DEBUG:
-				print(f"Populate: {s} @ 0x{o:02X} -> {t}")
+				print(f"\nPopulate: {s} @ 0x{o:02X} -> {t}")
 
-			ts = t.get_size() if isinstance(t, tinfo_t) else utils.get_proc_ptr_size()
-			fit, ovf = utils.can_fit_member(s, o, ts)
+			tsize = t.get_size() if isinstance(t, tinfo_t) else utils.get_proc_ptr_size()
+			fit, ovf = utils.can_fit_member(s, o, tsize)
 
-			if isinstance(t, Populator.Struct):
+			if isinstance(t, Struct):
 				tm = utils.get_member_type(s, o)
 				if tm and utils.is_struct_ptr(tm):
 					ts = tm.get_pointed_object()
@@ -629,19 +631,19 @@ class Populator:
 			utils.log_struct_action(s, o, added)
 
 	def resolve_conflict(self,
-	                     org: Populator.Struct | tinfo_t,
-	                     new: Populator.Struct | tinfo_t
-	                     ) -> Populator.Struct | tinfo_t:
+	                     org: Struct | tinfo_t,
+	                     new: Struct | tinfo_t
+	                     ) -> Struct | tinfo_t:
 		if DEBUG:
 			print(f"Type Conflict: ORG: {org} <-> NEW: {new}")
 
 		if org == new:
 			return org
 
-		if isinstance(org, Populator.Struct):
+		if isinstance(org, Struct):
 			return org
 
-		if isinstance(new, Populator.Struct):
+		if isinstance(new, Struct):
 			return new
 
 		org_str = str(org)
@@ -684,8 +686,8 @@ class Populator:
 
 		return new
 
-	def create_layout(self, results: list[RuleExtractResult]):
-		struct = Populator.Struct()
+	def create_layout(self, results: list[RuleExtractResult]) -> Struct:
+		struct = Struct()
 
 		def navigate(s, i):
 			o = i.off
@@ -693,15 +695,15 @@ class Populator:
 
 			if isinstance(t, tinfo_t):
 				org = s.get(o, None)
-				if not org:
+				if org is None:
 					s[o] = t
 				else:
 					s[o] = self.resolve_conflict(org, t)
 
 			elif isinstance(t, AccessInfo):
-				l = s.setdefault(o, Populator.Struct())
+				l = s.setdefault(o, Struct())
 				if isinstance(l, tinfo_t):
-					d = Populator.Struct()
+					d = Struct()
 					navigate(d, t)
 					s[o] = self.resolve_conflict(l, d)
 				else:
@@ -712,3 +714,30 @@ class Populator:
 				navigate(struct, info)
 
 		return struct
+
+	def clear_overlaps(self, layout: Struct, nested: Struct | None = None) -> Struct:
+		if not nested:
+			nested = Struct(layout)
+
+		if DEBUG:
+			print("\n------ OVERLAP CHECK ------")
+			self.pprint_layout(layout)
+
+		for off, tif in layout.items():
+			if isinstance(tif, Struct):
+				self.clear_overlaps(tif, nested.setdefault(off, Struct()))
+
+			elif isinstance(tif, tinfo_t):
+				size = tif.get_size()
+				for i in range(size - 1):
+					m_off = off + 1 + i
+					if m_tif := layout.get(m_off, None):
+						del nested[m_off]
+						if DEBUG:
+							print(f"Overlap Removed: {m_tif} @ 0x{m_off:02X} -> {tif} @ 0x{off:02X}")
+
+			else:
+				raise TypeError(f"Unexpected member type: {tif}")
+
+		return nested
+
