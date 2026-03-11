@@ -31,7 +31,7 @@ ParsePattern("""
 This declarative style is readable, maintainable, and makes it immediately clear what pattern you're matching. More importantly, extraction logic becomes trivial - once a pattern matches, the data you need is always at predictable positions in the matched items list, eliminating conditional branching and complex state tracking.
 
 > [!Note]
-> The built-in rules are designed to work with target variable typed as `__int64`. The current implementation temporarily assigns this type before pattern matching, then restores the inferred structure type. However, the pattern matching framework itself is completely generic - you can create rules to match any AST pattern regardless of variable types or context.
+> The built-in rules are designed to work with target variable typed as `__int64` (for non-stack variables). The current implementation temporarily assigns this type before pattern matching, then restores the inferred structure type. However, the pattern matching framework itself is completely generic - you can create rules to match any AST pattern regardless of variable types or context.
 
 ## Key Features
 
