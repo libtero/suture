@@ -3,13 +3,14 @@
     "plugin": {
         "name": "Suture",
         "entryPoint": "main.py",
-        "version": "1.2.0",
+        "version": "1.2.5",
         "description": "Automated structure recovery using AST pattern matching",
         "logoPath": "icon.png",
         "license": "MIT",
         "categories": [
             "ui-ux-and-visualization"
         ],
+        "idaVersions": ">=9.2",
         "urls": {
             "repository": "https://github.com/libtero/suture"
         },

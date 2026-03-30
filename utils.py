@@ -130,6 +130,13 @@ def can_process_lvar(vdui: ida_hexrays.vdui_t) -> bool:
 	return False
 
 
+def get_action_menu_label() -> str:
+	lvar = get_cursor_lvar(get_current_vdui())
+	if is_struct_ptr(lvar.tif) or lvar.tif.is_struct():
+		return "Update struct members"
+	return "Create struct members"
+
+
 def log_struct_action(struct_tif: ida_typeinf.tinfo_t,
                       off: int,
                       added: bool):

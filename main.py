@@ -6,8 +6,6 @@ import ida_idaapi
 import common
 import utils
 
-ACTION_NAME = "suture:create_update_struct"
-
 
 class Suture(ida_kernwin.action_handler_t):
 	def __init__(self):
@@ -44,7 +42,7 @@ class Suture(ida_kernwin.action_handler_t):
 	def init_attrs(self):
 		lvar = utils.get_cursor_lvar(self.vdui)
 		self.lvar_name = lvar.name
-		self.lvar_type = ida_typeinf.tinfo_t(str(lvar.tif))
+		self.lvar_type = lvar.tif.copy()
 		self.lvar_type_new = None
 		self.is_stk_lvar = lvar.is_stk_var()
 
@@ -69,7 +67,7 @@ class Suture(ida_kernwin.action_handler_t):
 			print("\n".join([str(i) for i in filtered]))
 
 		if not filtered:
-			print("No struct access found")
+			ida_kernwin.warning("No struct member access found")
 			return
 
 		ask = False
@@ -102,9 +100,10 @@ class ContextHook(ida_kernwin.UI_Hooks):
 	def finish_populating_widget_popup(self, widget, popup_handle, ctx=None):
 		if not ida_kernwin.get_widget_type(widget) == ida_kernwin.BWN_PSEUDOCODE \
 				or not utils.can_process_lvar(ida_hexrays.get_widget_vdui(widget)):
-			ida_kernwin.detach_action_from_popup(widget, ACTION_NAME)
+			ida_kernwin.detach_action_from_popup(widget, SuturePlugin.action_name)
 		else:
-			ida_kernwin.attach_action_to_popup(widget, popup_handle, ACTION_NAME)
+			ida_kernwin.attach_action_to_popup(widget, popup_handle, SuturePlugin.action_name)
+			ida_kernwin.update_action_label(SuturePlugin.action_name, utils.get_action_menu_label())
 
 
 def run_tests():
@@ -124,6 +123,7 @@ def run_tests():
 
 
 class SuturePlugin(ida_idaapi.plugin_t):
+	action_name = "hx:CreateUpdateMembers"
 	wanted_name = "Suture"
 	flags = ida_idaapi.PLUGIN_HIDE
 
@@ -133,7 +133,7 @@ class SuturePlugin(ida_idaapi.plugin_t):
 		if not ida_hexrays.init_hexrays_plugin():
 			return ida_idaapi.PLUGIN_SKIP
 		if not ida_kernwin.register_action(ida_kernwin.action_desc_t(
-				ACTION_NAME, "Create/Update struct members", Suture(), shortcut="Shift-F")
+				self.action_name, "Create struct members", Suture(), shortcut="Shift-F")
 		):
 			return ida_idaapi.PLUGIN_SKIP
 		self.hook = ContextHook()
