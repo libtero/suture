@@ -3,6 +3,7 @@ from typing import Callable, Type
 from abc import ABC, abstractmethod
 
 import ida_hexrays
+import ida_kernwin
 import ida_typeinf
 import ida_lines
 import utils
@@ -436,11 +437,12 @@ class RuleSet(ABC):
 			reverse=True
 		)
 
-	def add_rules(self, rules: list[Rule]):
-		self._rules.extend(rules)
-
 	def __str__(self):
 		return str(self.__class__.__name__)
+
+	def __add__(self, other):
+		self._rules.extend(other._rules)
+		return self
 
 
 class Visitor(ida_hexrays.ctree_visitor_t):
@@ -582,14 +584,9 @@ class Populator:
 	def run(self):
 		layout_raw = self.create_layout(self.results)
 		layout = self.clear_overlaps(layout_raw)
-		if DEBUG:
-			print(f"\n------ LAYOUT RAW ------")
-			self.pprint_layout(layout_raw)
-			print(f"\n------ LAYOUT CLEARED ------")
-			self.pprint_layout(layout)
 		self.populate(self.struct_tif, layout, self.shift)
 
-	def pprint_layout(self, l: Struct, lvl = 0):
+	def pprint_layout(self, l: Struct, lvl=0):
 		for k, v in sorted(l.items()):
 			if isinstance(v, Struct):
 				print("    " * lvl + f"0x{k:02X} ->")
@@ -599,6 +596,9 @@ class Populator:
 
 	def populate(self, s: ida_typeinf.tinfo_t, l: dict[int, dict | tinfo_t], shift=0):
 		for o, t in l.items():
+			if utils.to_signed(o) + shift < 0:
+				continue
+
 			o += shift
 			n = f"field_{o:X}"
 			added = False
@@ -616,6 +616,7 @@ class Populator:
 					shift = utils.get_ptr_shift(tm)
 					self.populate(ts, t, shift)
 					continue
+
 				elif fit:
 					n = utils.new_tmpstruct_name()
 					ts = utils.add_struct(n)
@@ -690,8 +691,8 @@ class Populator:
 		struct = Struct()
 
 		def navigate(s, i):
-			o = i.off
-			t = i.tif
+			o: int = i.off
+			t: tinfo_t = i.tif
 
 			if isinstance(t, tinfo_t):
 				org = s.get(o, None)
@@ -713,6 +714,10 @@ class Populator:
 			for info in r:
 				navigate(struct, info)
 
+		if DEBUG:
+			print(f"\n------ LAYOUT RAW ------")
+			self.pprint_layout(struct)
+
 		return struct
 
 	def clear_overlaps(self, layout: Struct, nested: Struct | None = None) -> Struct:
@@ -723,21 +728,31 @@ class Populator:
 			print("\n------ OVERLAP CHECK ------")
 			self.pprint_layout(layout)
 
-		for off, tif in layout.items():
+		for off, tif in list(layout.items()):
 			if isinstance(tif, Struct):
 				self.clear_overlaps(tif, nested.setdefault(off, Struct()))
 
 			elif isinstance(tif, tinfo_t):
 				size = tif.get_size()
+				if size == ida_typeinf.BADSIZE:
+					del nested[off]
+					ida_kernwin.warning(f"Failed to retrieve type size for:\n{tif}\n\nType candidate will be ignored.")
+					continue
+
 				for i in range(size - 1):
 					m_off = off + 1 + i
 					if m_tif := layout.get(m_off, None):
-						del nested[m_off]
+						if m_off in nested:
+							del nested[m_off]
 						if DEBUG:
 							print(f"Overlap Removed: {m_tif} @ 0x{m_off:02X} -> {tif} @ 0x{off:02X}")
 
 			else:
 				raise TypeError(f"Unexpected member type: {tif}")
+		
+		if DEBUG:
+			print(f"\n------ LAYOUT CLEARED ------")
+			self.pprint_layout(nested)
 
 		return nested
 

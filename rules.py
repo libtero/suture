@@ -1,5 +1,5 @@
 import ida_typeinf
-from ida_hexrays import cexpr_t, cot_call, cot_add, cot_var, cot_num, cot_ptr, cot_cast
+from ida_hexrays import cexpr_t, cot_call, cot_add, cot_var, cot_num, cot_ptr, cot_cast, make_pointer
 from common import RuleExtractResult, AccessInfo, Slice, Rule
 from ruletools import ParsePattern, DebugItems, PrintItem
 
@@ -71,7 +71,7 @@ class VirtualDispatch(Rule):
 
 	def extract(self, items: list[cexpr_t]) -> RuleExtractResult:
 		r1 = AccessInfo(0,
-		                AccessInfo(items[6].numval(), items[0].type))
+		                AccessInfo(items[6].numval(), make_pointer(items[0].type)))
 		return RuleExtractResult(r1, self)
 
 
@@ -92,9 +92,11 @@ class IndirectionPath1(Rule):
 			""")
 
 	def extract(self, items: list[cexpr_t]) -> RuleExtractResult:
+		tif = items[0].type
+		tif = make_pointer(tif) if tif.is_func() else tif
 		r1 = AccessInfo(items[8].numval(),
 		                AccessInfo(0,
-		                           AccessInfo(items[9].numval(), items[0].type)))
+		                           AccessInfo(items[9].numval(), tif)))
 		return RuleExtractResult(r1, self)
 
 
@@ -181,7 +183,7 @@ class FunctionArgument1(Rule):
 			""")
 
 	def extract(self, items: list[cexpr_t]) -> RuleExtractResult:
-		r1 = AccessInfo(items[3].numval(), ida_typeinf.remove_pointer(items[0].type))
+		r1 = AccessInfo(items[3].numval(), items[0].type)
 		return RuleExtractResult(r1, self)
 
 

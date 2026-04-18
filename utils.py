@@ -3,6 +3,7 @@ import ida_typeinf
 import ida_kernwin
 import ida_hexrays
 import idc
+import ctypes
 
 
 def is_struct_ptr(tif: ida_typeinf.tinfo_t) -> bool:
@@ -161,3 +162,10 @@ def get_ptr_shift(t: ida_typeinf.tinfo_t) -> int:
 
 def get_proc_ptr_size() -> int:
 	return 8 if idc.__EA64__ else 4
+
+
+def to_signed(val: int) -> int:
+	if idc.__EA64__:
+		return ctypes.c_int64(val).value
+	else:
+		return ctypes.c_int32(val).value
